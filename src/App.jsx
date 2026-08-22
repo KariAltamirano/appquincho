@@ -470,7 +470,7 @@ function App() {
       .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
       .join('\r\n')
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
@@ -620,7 +620,6 @@ function App() {
                 setDocumentForm((prev) => ({ ...prev, driveLink: event.target.value }))
               }
               placeholder="https://drive.google.com/..."
-              required
             />
           </label>
           <label>
@@ -685,9 +684,13 @@ function App() {
                     <td>{item.date}</td>
                     <td>{item.description || '-'}</td>
                     <td>
-                      <a href={item.driveLink} target="_blank" rel="noreferrer">
-                        Ver
-                      </a>
+                      {item.driveLink ? (
+                        <a href={item.driveLink} target="_blank" rel="noreferrer">
+                          Ver
+                        </a>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td className="actions-cell">
                       <button type="button" onClick={() => onEditDocument(item)}>

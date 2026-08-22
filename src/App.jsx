@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 const STORAGE_KEY = 'quincho.project.data.v1'
-const DRIVE_ROOT_URL =
-  'https://drive.google.com/drive/folders/1TWXSkbYwu9SvYu3KL3diqOfOFTZYn96e'
+const DRIVE_ROOT_URL = import.meta.env.VITE_DRIVE_ROOT_URL || ''
 const DOCUMENT_CATEGORIES = ['Planos', 'Recibos de materiales', 'Comprobantes de pago']
 
 const currencyFormatter = new Intl.NumberFormat('es-AR', {
@@ -87,6 +86,7 @@ const initialDocumentForm = {
 }
 
 const getDriveRootId = () => {
+  if (!DRIVE_ROOT_URL) return ''
   const matched = DRIVE_ROOT_URL.match(/folders\/([^/?]+)/)
   return matched?.[1] || ''
 }
@@ -100,9 +100,13 @@ const getDriveToken = () => {
   return tokenFromGapi || tokenFromWindow || null
 }
 
+const escapeDriveQueryValue = (value) => String(value).replaceAll('\\', '\\\\').replaceAll("'", "\\'")
+
 const createOrFindDriveFolder = async (token, parentFolderId, folderName) => {
+  const safeParentFolderId = escapeDriveQueryValue(parentFolderId)
+  const safeFolderName = escapeDriveQueryValue(folderName)
   const query = encodeURIComponent(
-    `mimeType='application/vnd.google-apps.folder' and trashed=false and '${parentFolderId}' in parents and name='${folderName.replace(/'/g, "\\'")}'`,
+    `mimeType='application/vnd.google-apps.folder' and trashed=false and '${safeParentFolderId}' in parents and name='${safeFolderName}'`,
   )
 
   const searchResponse = await fetch(
@@ -303,11 +307,10 @@ function App() {
 
   const timelineSeries = useMemo(() => {
     const ordered = [...allExpenses].sort((a, b) => toDateValue(a.date) - toDateValue(b.date))
-    let running = 0
-    return ordered.map((entry) => {
-      running += parseNumber(entry.amount)
-      return { date: entry.date, total: running }
-    })
+    return ordered.reduce((acc, entry) => {
+      const previous = acc.length ? acc[acc.length - 1].total : 0
+      return [...acc, { date: entry.date, total: previous + parseNumber(entry.amount) }]
+    }, [])
   }, [allExpenses])
 
   const onSaveBudget = (event) => {
@@ -465,15 +468,17 @@ function App() {
 
     const csv = [header, ...rows]
       .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
-      .join('\n')
+      .join('\r\n')
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = 'gastos-quincho.csv'
+    document.body.append(anchor)
     anchor.click()
-    URL.revokeObjectURL(url)
+    anchor.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 250)
   }
 
   const maxTimeline = timelineSeries.length
@@ -489,9 +494,13 @@ function App() {
       <header className="header">
         <h1>Registro de Proyecto Quincho</h1>
         <p>Control de presupuesto, materiales, pagos y documentos de obra.</p>
-        <a href={DRIVE_ROOT_URL} target="_blank" rel="noreferrer" className="drive-link">
-          Carpeta principal de Google Drive
-        </a>
+        {DRIVE_ROOT_URL ? (
+          <a href={DRIVE_ROOT_URL} target="_blank" rel="noreferrer" className="drive-link">
+            Carpeta principal de Google Drive
+          </a>
+        ) : (
+          <p className="warning">Definí VITE_DRIVE_ROOT_URL para habilitar carga automática a Drive.</p>
+        )}
         {storageMessage ? <p className="warning">{storageMessage}</p> : null}
       </header>
 
@@ -1020,7 +1029,13 @@ function App() {
       <section className="card">
         <h2>Gasto acumulado en el tiempo</h2>
         {timelineSeries.length ? (
-          <svg className="chart" viewBox="0 0 100 40" preserveAspectRatio="none" role="img">
+          <svg
+            className="chart"
+            viewBox="0 0 100 40"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="Gráfico de gasto acumulado en el tiempo"
+          >
             <polyline
               fill="none"
               stroke="currentColor"

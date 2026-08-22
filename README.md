@@ -19,9 +19,9 @@ Los datos se guardan en `window.storage` bajo la clave `quincho.project.data.v1`
 
 ## Integración Google Drive
 
-La app intenta subir archivos a la carpeta:
+La app intenta subir archivos a la carpeta definida por variable de entorno:
 
-`https://drive.google.com/drive/folders/1TWXSkbYwu9SvYu3KL3diqOfOFTZYn96e`
+`VITE_DRIVE_ROOT_URL`
 
 Requiere sesión autenticada de Google Drive en frontend:
 
@@ -29,6 +29,12 @@ Requiere sesión autenticada de Google Drive en frontend:
 - `window.driveAccessToken`
 
 Si no hay token válido, la app muestra error y permite guardar manualmente un enlace de Drive.
+
+Ejemplo de configuración:
+
+```bash
+cp .env.example .env.local
+```
 
 ## Desarrollo
 
